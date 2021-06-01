@@ -1,0 +1,63 @@
+# This script uses Microsoft.Xrm.Data.Powershell module. 
+# Duplicate detection rule name is passed as an argument, and this script will publish it if it was not published alread.
+#
+
+function Publish-CrmDuplicateDetectionRules{
+
+[CmdletBinding()]
+PARAM(
+[parameter(Mandatory=$true)]
+[Microsoft.Xrm.Tooling.Connector.CrmServiceClient]$conn,
+[parameter(Mandatory=$true, Position=1)]
+[string]$DuplicateDetectionRule,
+[parameter(Mandatory=$false, Position=2)]
+[bool]$PublishAll
+)
+
+$fetch = @"
+<fetch>
+<entity name="duplicaterule">
+<all-attributes/>
+<filter>
+<condition attribute="statuscode" operator="eq" value="0" />
+<condition attribute="name" operator="eq" value="$DuplicateDetectionRule"/>
+</filter>
+</entity>
+</fetch>
+"@
+$matchingDDRules = Get-CrmRecordsByFetch -conn $conn -Fetch $fetch
+
+Write-Host $matchingDDRules.Count "rules found"
+
+if($matchingDDRules.Count -lt 1)
+{
+throw "Duplicate rule $DuplicateDetectionRule did not exist"
+}
+
+$PublishAll
+
+if($PublishAll -eq $false)
+{ 
+
+Write-Host "Publishing one rule"
+$ddRule_toPublish = New-Object Microsoft.Crm.Sdk.Messages.PublishDuplicateRuleRequest
+$ddRule_toPublish.DuplicateRuleId= $matchingDDRules.CrmRecords[0].duplicateruleid
+$conn.ExecuteCrmOrganizationRequest($ddRule_toPublish,$trace)
+
+}
+
+else
+{ 
+
+Write-Host "Publishing rules"
+foreach($rule in $matchingDDRules.CrmRecords)
+{
+write-host "rule is " $rule.duplicateruleid
+$ddRule_toPublish = New-Object Microsoft.Crm.Sdk.Messages.PublishDuplicateRuleRequest
+$ddRule_toPublish.DuplicateRuleId= $rule.duplicateruleid
+$conn.ExecuteCrmOrganizationRequest($ddRule_toPublish,$trace)
+Write-Host "Rule Published"
+}
+
+}
+}
