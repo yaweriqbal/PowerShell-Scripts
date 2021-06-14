@@ -1,0 +1,52 @@
+#This script uses Microsfot.Xrm.Data.PowerShell module
+#Update name of solution in below line, instead of rte_V1 add name of solution.
+#This script was written few years back and is only for sample purposes.
+
+$solutionName ="rte_V1″
+$env:TEMP
+Set-StrictMode -Version latest
+function InstallModule{
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+$moduleName = "Microsoft.Xrm.Data.Powershell"
+$moduleVersion = "2.7.2"
+if (!(Get-Module -ListAvailable -Name $moduleName )) {
+Write-host "Module Not found, installing now"
+$moduleVersion
+Install-Module -Name $moduleName -MinimumVersion $moduleVersion -Force
+}
+else
+{
+Write-host "Module Found"
+}
+}
+function GetCrmConn{
+param(
+[string]$user,
+[string]$secpasswd,
+[string]$crmUrl)
+Write-Host "UserId: $user Password: $secpasswd CrmUrl: $crmUrl"
+$secpasswd2 = ConvertTo-SecureString -String $secpasswd -AsPlainText -Force
+write-host "Creating credentials"
+$mycreds = New-Object System.Management.Automation.PSCredential ($User, $secpasswd2)
+write-host "Credentials object created"
+write-host "Establishing crm connection next"
+$crm = Connect-CrmOnline -Credential $mycreds -ServerUrl $CrmUrl
+write-host "Crm connection established"
+return $crm
+}
+InstallModule
+#Update Source CRM instance details below:
+Write-Host "going to create first connection"
+$Crm1 = GetCrmConn -user "user@crm1st.onmicrosoft.com" -secpasswd "P@ssword001122" -crmUrl "https://crm1st.crm6.dynamics.com"
+Write-Host "first connection created"
+Set-CrmConnectionTimeout -conn $Crm1 -TimeoutInSeconds 1000
+#Update target CRM instance below:
+Write-Host "going to create second connection"
+$Crm2 = GetCrmConn -user "user@crm2nd.onmicrosoft.com" -secpasswd "P@ssword001122" -crmUrl "https://crm.crm6.dynamics.com"
+Write-Host "second connection created"
+Write-Host "Exporting Solution"
+Export-CrmSolution -conn $Crm1 -SolutionName "$solutionName" -SolutionFilePath $env:TEMP -SolutionZipFileName "$solutionName.zip"
+Set-CrmConnectionTimeout -conn $Crm2 -TimeoutInSeconds 1000
+Write-host "Importing Solution"
+Import-CrmSolution -conn $Crm2 -SolutionFilePath "$env:TEMP\$solutionName.zip"
+Write-Host "Publishing rules"
